@@ -1,26 +1,39 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using DotNetCoreSqlDb.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DATABASE
+// =====================
+// DATABASE CONFIG (MySQL)
+// =====================
 builder.Services.AddDbContext<MyDatabaseContext>(options =>
 {
-    var conn = builder.Configuration.GetConnectionString(
-        builder.Environment.IsDevelopment()
-            ? "MyDbConnection"
-            : "AZURE_SQL_CONNECTIONSTRING"
-    );
+    var conn =
+        builder.Configuration["AZURE_SQL_CONNECTIONSTRING"]
+        ?? builder.Configuration.GetConnectionString("MyDbConnection");
+
+    if (string.IsNullOrEmpty(conn))
+    {
+        throw new Exception("Database connection string is missing.");
+    }
 
     options.UseMySql(conn, ServerVersion.AutoDetect(conn));
 });
 
-// CACHE
+// =====================
+// CACHE CONFIG
+// =====================
 if (!builder.Environment.IsDevelopment())
 {
     builder.Services.AddStackExchangeRedisCache(options =>
     {
         options.Configuration = builder.Configuration["AZURE_REDIS_CONNECTIONSTRING"];
+
+        if (string.IsNullOrEmpty(options.Configuration))
+        {
+            throw new Exception("Redis connection string is missing.");
+        }
+
         options.InstanceName = "SampleInstance";
     });
 }
@@ -29,18 +42,25 @@ else
     builder.Services.AddDistributedMemoryCache();
 }
 
+// =====================
 // MVC
+// =====================
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
-// AUTO MIGRATION ON STARTUP (KEY FIX)
+// =====================
+// AUTO MIGRATION
+// =====================
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<MyDatabaseContext>();
     db.Database.Migrate();
 }
 
+// =====================
+// PIPELINE
+// =====================
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -49,6 +69,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseRouting();
 app.UseAuthorization();
 
