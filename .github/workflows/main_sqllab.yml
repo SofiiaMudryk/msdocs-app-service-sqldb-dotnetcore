@@ -33,10 +33,13 @@ jobs:
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       - name: Create migration bundle
-        run: dotnet ef migrations bundle --runtime linux-x64 --output publish/migrate
+        run: dotnet ef migrations bundle --runtime linux-x64 -o migrate
 
-      - name: Publish
-        run: dotnet publish -c Release -o publish
+      - name: Prepare publish folder
+        run: mkdir -p publish && cp -r bin/Release/net8.0/publish/* publish/ 2>/dev/null || true
+
+      - name: Move migration into publish
+        run: mv migrate publish/migrate
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
