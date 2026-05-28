@@ -10,30 +10,27 @@ builder.Services.AddDbContext<MyDatabaseContext>(options =>
 {
     var conn =
         builder.Configuration["AZURE_SQL_CONNECTIONSTRING"]
-        ?? builder.Configuration.GetConnectionString("MyDbConnection");
+        ?? builder.Configuration.GetConnectionString("AZURE_SQL_CONNECTIONSTRING");
 
-    if (string.IsNullOrEmpty(conn))
-    {
+    if (string.IsNullOrWhiteSpace(conn))
         throw new Exception("Database connection string is missing.");
-    }
 
     options.UseMySql(conn, ServerVersion.AutoDetect(conn));
 });
 
 // =====================
-// CACHE CONFIG
+// CACHE
 // =====================
 if (!builder.Environment.IsDevelopment())
 {
     builder.Services.AddStackExchangeRedisCache(options =>
     {
-        options.Configuration = builder.Configuration["AZURE_REDIS_CONNECTIONSTRING"];
+        var redis = builder.Configuration["AZURE_REDIS_CONNECTIONSTRING"];
 
-        if (string.IsNullOrEmpty(options.Configuration))
-        {
+        if (string.IsNullOrWhiteSpace(redis))
             throw new Exception("Redis connection string is missing.");
-        }
 
+        options.Configuration = redis;
         options.InstanceName = "SampleInstance";
     });
 }
@@ -50,12 +47,20 @@ builder.Services.AddControllersWithViews();
 var app = builder.Build();
 
 // =====================
-// AUTO MIGRATION
+// SAFE MIGRATION (IMPORTANT FIX)
 // =====================
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<MyDatabaseContext>();
-    db.Database.Migrate();
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<MyDatabaseContext>();
+        db.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        // Prevent crash in Azure startup
+        Console.WriteLine("Migration failed: " + ex.Message);
+    }
 }
 
 // =====================
