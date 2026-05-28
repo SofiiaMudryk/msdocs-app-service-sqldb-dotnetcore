@@ -1,3 +1,4 @@
+```yaml
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
@@ -28,6 +29,15 @@ jobs:
 
       - name: Build with dotnet
         run: dotnet build --configuration Release --no-restore
+
+      - name: Install EF Tool
+        run: dotnet tool install --global dotnet-ef --version 8.0.0
+
+      - name: Add dotnet tools to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Create migration bundle
+        run: dotnet ef migrations bundle --runtime linux-x64 --output publish/migrate
 
       - name: Publish
         run: dotnet publish -c Release -o publish
@@ -65,3 +75,4 @@ jobs:
           app-name: 'SQLLab'
           slot-name: 'Production'
           package: publish
+```
