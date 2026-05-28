@@ -4,73 +4,54 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up .NET
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restore dependencies
+      - name: Restore
         run: dotnet restore
 
-      - name: Build with dotnet
+      - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      - name: Install EF Tool
-        run: dotnet tool install --global dotnet-ef --version 8.0.0
-
-      - name: Add dotnet tools to PATH
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-
-      - name: Create migration bundle
-        run: dotnet ef migrations bundle --runtime linux-x64 -o migrate
-
-      - name: Prepare publish folder
-        run: mkdir -p publish && cp -r bin/Release/net8.0/publish/* publish/ 2>/dev/null || true
-
-      - name: Move migration into publish
-        run: mv migrate publish/migrate
+      - name: Publish
+        run: dotnet publish -c Release -o publish
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dotnet-app
+          name: app
           path: publish
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: dotnet-app
+          name: app
           path: publish
 
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_36B81F26E3D847119082D41C519584DC }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_03FF2C03E4F946A7BA8FFE9B3D4845C9 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_848424281AD947519FC5C1A796029AF9 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID }}
 
-      - name: Deploy to Azure Web App
+      - name: Deploy
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'SQLLab'
-          slot-name: 'Production'
+          app-name: SQLLab
           package: publish

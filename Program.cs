@@ -3,41 +3,44 @@ using DotNetCoreSqlDb.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add database context and cache
-if (builder.Environment.IsDevelopment())
+// DATABASE
+builder.Services.AddDbContext<MyDatabaseContext>(options =>
 {
-    builder.Services.AddDbContext<MyDatabaseContext>(options =>
-        options.UseMySql(
-            builder.Configuration.GetConnectionString("MyDbConnection"),
-            ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("MyDbConnection"))
-        ));
+    var conn = builder.Configuration.GetConnectionString(
+        builder.Environment.IsDevelopment()
+            ? "MyDbConnection"
+            : "AZURE_SQL_CONNECTIONSTRING"
+    );
 
-    builder.Services.AddDistributedMemoryCache();
-}
-else
+    options.UseMySql(conn, ServerVersion.AutoDetect(conn));
+});
+
+// CACHE
+if (!builder.Environment.IsDevelopment())
 {
-    builder.Services.AddDbContext<MyDatabaseContext>(options =>
-        options.UseMySql(
-            builder.Configuration["AZURE_MYSQL_CONNECTIONSTRING"],
-            ServerVersion.AutoDetect(builder.Configuration["AZURE_MYSQL_CONNECTIONSTRING"])
-        ));
-
     builder.Services.AddStackExchangeRedisCache(options =>
     {
         options.Configuration = builder.Configuration["AZURE_REDIS_CONNECTIONSTRING"];
         options.InstanceName = "SampleInstance";
     });
 }
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
 
-// Add services to the container.
+// MVC
 builder.Services.AddControllersWithViews();
-
-// Add App Service logging
-builder.Logging.AddAzureWebAppDiagnostics();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// AUTO MIGRATION ON STARTUP (KEY FIX)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<MyDatabaseContext>();
+    db.Database.Migrate();
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -46,9 +49,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-
 app.UseAuthorization();
 
 app.MapControllerRoute(
