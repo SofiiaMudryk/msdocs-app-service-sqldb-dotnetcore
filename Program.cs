@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using DotNetCoreSqlDb.Data;
 
 var builder = WebApplication.CreateBuilder(args);
